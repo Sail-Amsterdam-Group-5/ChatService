@@ -113,6 +113,7 @@ public class MessagesController : ControllerBase
     //}
 
     [HttpPost]
+    [Consumes("application/json", "multipart/form-data")]
     public async Task<IActionResult> SendMessage([FromForm] CreateMessageDto createMessageDto)
     {
         try

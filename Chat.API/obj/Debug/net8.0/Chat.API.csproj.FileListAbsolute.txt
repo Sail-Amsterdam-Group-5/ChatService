@@ -89,3 +89,4 @@ C:\Users\tommy\Desktop\school\cloud-minor\API\ChatService\Chat.API\bin\Debug\net
 C:\Users\tommy\Desktop\school\cloud-minor\API\ChatService\Chat.API\bin\Debug\net8.0\Microsoft.Extensions.Logging.dll
 C:\Users\tommy\Desktop\school\cloud-minor\API\ChatService\Chat.API\bin\Debug\net8.0\Microsoft.Extensions.Logging.Abstractions.dll
 C:\Users\tommy\Desktop\school\cloud-minor\API\ChatService\Chat.API\bin\Debug\net8.0\System.Diagnostics.DiagnosticSource.dll
+C:\Users\tommy\Desktop\school\cloud-minor\API\ChatService\Chat.API\obj\Debug\net8.0\Chat.API.sourcelink.json
