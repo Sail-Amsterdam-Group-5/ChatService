@@ -6,7 +6,7 @@ metadata:
   labels:
     app: sail-chat-api
 spec:
-  replicas: 1 # Makes 1 replica
+  replicas: 1 # Makes 1 replica's
   selector:
     matchLabels:
       app: sail-chat-api
