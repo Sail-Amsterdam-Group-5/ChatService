@@ -5,7 +5,7 @@ on:
     branches:
       - "features/**"
     paths:
-      - '**.ts'
+      - '**.cs'
       - 'deployment.yml'
   pull_request:
     branches:
