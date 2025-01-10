@@ -67,51 +67,6 @@ public class MessagesController : ControllerBase
         }
     }
 
-    //[HttpPost]
-    //public async Task<IActionResult> SendMessage(CreateMessageDto createMessageDto)
-    //{
-    //    try
-    //    {
-    //        // Verify user is a participant in the chat
-    //        var chat = await _chatService.GetChatByIdAsync(createMessageDto.ChatId);
-    //        if (chat == null)
-    //            return NotFound("Chat not found");
-
-    //        if (!chat.Participants.Any(p => p.UserId == UserId))
-    //            return Forbid();
-
-    //        // Additional validation for team leads and admins
-    //        //if (!IsAdmin && !IsTeamLead && chat.Type == "group")
-    //        //{
-    //        //    var userRole = User.GetUserRole();
-    //        //    if (userRole == "volunteer" && !chat.Participants.Any(p => p.UserId == UserId && p.Role == "member"))
-    //        //    {
-    //        //        return Forbid("Volunteers can only send messages in groups where they are members");
-    //        //    }
-    //        //}
-
-    //        // Validate message content based on type
-    //        if (createMessageDto.Type == "text" && string.IsNullOrEmpty(createMessageDto.Content.Text))
-    //        {
-    //            return BadRequest("Text message cannot be empty");
-    //        }
-    //        else if (createMessageDto.Type == "image" && string.IsNullOrEmpty(createMessageDto.Content.ImageUrl))
-    //        {
-    //            return BadRequest("Image URL cannot be empty");
-    //        }
-
-    //        var message = await _messageService.SendMessageAsync(createMessageDto, UserId);
-    //        return CreatedAtAction(
-    //            nameof(GetChatMessages),
-    //            new { chatId = message.ChatId },
-    //            message);
-    //    }
-    //    catch (ChatException ex)
-    //    {
-    //        return BadRequest(ex.Message);
-    //    }
-    //}
-
     [HttpPost]
     [Consumes("application/json", "multipart/form-data")]
     public async Task<IActionResult> SendMessage([FromForm] CreateMessageDto createMessageDto)
