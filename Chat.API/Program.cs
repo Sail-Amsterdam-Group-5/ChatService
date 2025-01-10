@@ -58,13 +58,31 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 // Add CORS policy for frontend
+//builder.Services.AddCors(options =>
+//{
+//    options.AddPolicy("AllowAll", builder =>
+//        builder.AllowAnyOrigin()
+//               .AllowAnyMethod()
+//               .AllowAnyHeader()
+//               .WithExposedHeaders("Authorization"));
+//});
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", builder =>
-        builder.AllowAnyOrigin()
-               .AllowAnyMethod()
-               .AllowAnyHeader()
-               .WithExposedHeaders("Authorization"));
+    {
+        builder
+            .WithOrigins(
+                "http://localhost:5173",    // local frontend URL
+                "http://127.0.0.1:5173",    // Alternative local URL
+                "http://localhost:3000",     // In case of a different port
+                "https://localhost:5173",    // HTTPS versions
+                "https://localhost:3000"
+            )
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials()             // Required for WebSocket
+            .WithExposedHeaders("Authorization");
+    });
 });
 
 var app = builder.Build();
