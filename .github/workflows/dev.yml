@@ -72,13 +72,12 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    # Step 7: Build and push Docker image
+    # Step 7: Build and Push Docker Image
     - name: Build and push Docker image
-      uses: docker/build-push-action@v4
-      with:
-        context: .
-        push: true
-        tags: earlybirdreal/sail-chat-api:${{ github.sha }}
+      run: |
+        docker build -t earlybirdreal/sail-chat-api:${{ github.sha }} .
+        echo "${{ secrets.DOCKER_PASSWORD }}" | docker login --username ${{ secrets.DOCKER_USERNAME }} --password-stdin
+        docker push earlybirdreal/sail-chat-api:${{ github.sha }}
 
     # Step 9: Commit and push changes to the branch ArgoCD monitors
     - name: Commit and push changes
