@@ -1,0 +1,114 @@
+name: Build, Test, Lint, and Update ArgoCD
+
+on:
+  push:
+    branches:
+      - "features/**"
+    paths:
+      - '**.ts'
+      - 'deployment.yml'
+  pull_request:
+    branches:
+      - 'features/**'
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+jobs:
+  # Linting Job
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0' # Adjust this to your .NET version
+
+    - name: Run Linter
+      run: dotnet format --verify-no-changes
+      continue-on-error: true # Prevents breaking on linting issues but reports them
+
+  # Testing Job
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0' # Adjust this to your .NET version
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build project
+      run: dotnet build --no-restore --configuration Release
+
+    - name: Run tests
+      run: dotnet test --no-build --verbosity normal
+
+  # Deployment Job
+  deploy:
+    needs: [lint, test] # Ensures this job runs only after linting and testing succeed
+    runs-on: ubuntu-latest
+
+    steps:
+    # Step 1: Checkout code
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # Step 2: Set up .NET environment
+    - name: Set up .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0'
+
+    # Step 3: Restore dependencies
+    - name: Restore dependencies
+      run: dotnet restore
+
+    # Step 4: Build the project
+    - name: Build project
+      run: dotnet build --no-restore --configuration Release
+
+    # Step 5: Publish the application
+    - name: Publish application
+      run: dotnet publish -c Release -o output
+
+    # Step 6: Log in to Docker Hub (or your preferred registry)
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    # Step 7: Build and push Docker image
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: earlybirdreal/sail-chat-api:${{ github.sha }}
+
+    # Step 8: Update Kubernetes manifest
+    - name: Update Kubernetes manifest
+      run: |
+        sed -i "s|image: earlybirdreal/sail-chat-api:.*|image: earlybirdreal/sail-chat-api:${{ github.sha }}|" openshift/deployment.yaml
+
+    # Step 9: Commit and push changes to the branch ArgoCD monitors
+    - name: Commit and push changes
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git checkout -b deployment-update-branch # Change this to the branch ArgoCD is watching
+        git add openshift/deployment.yaml
+        git commit -m "Update image tag to ${{ github.sha }}"
+        git push origin deployment-update-branch --force
