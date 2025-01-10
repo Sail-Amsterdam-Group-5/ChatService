@@ -83,7 +83,7 @@ jobs:
     # Step 8: Update Kubernetes manifest
     - name: Update Kubernetes manifest
       run: |
-        sed -i "s|image: earlybirdreal/sail-chat-api:.*|image: earlybirdreal/sail-chat-api:${{ github.sha }}|" openshift/deployment.yaml
+        sed -i "s|image: earlybirdreal/sail-chat-api:.*|image: earlybirdreal/sail-chat-api:${{ github.sha }}|" openshift/deployment.yml
 
     # Step 9: Commit and push changes to the branch ArgoCD monitors
     - name: Commit and push changes
@@ -91,6 +91,6 @@ jobs:
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
         git checkout -b deployment-update-branch # Change this to the branch ArgoCD is watching
-        git add openshift/deployment.yaml
+        git add openshift/deployment.yml
         git commit -m "Update image tag to ${{ github.sha }}"
         git push origin deployment-update-branch --force
