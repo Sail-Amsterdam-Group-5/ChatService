@@ -6,7 +6,7 @@ on:
       - "features/**"
     paths:
       - '**.cs'
-      - 'deployment.yml'
+      - 'openshift/deployment.yml'
   pull_request:
     branches:
       - 'features/**'
