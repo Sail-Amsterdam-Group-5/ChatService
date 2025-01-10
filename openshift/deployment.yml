@@ -21,6 +21,32 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
+          env:
+            - name: CosmosDb__ConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: sail-chat-api-secrets
+                  key: CosmosDb__ConnectionString
+            - name: BlobStorage__ConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: sail-chat-api-secrets
+                  key: BlobStorage__ConnectionString
+            - name: BlobStorage__BaseUrl
+              valueFrom:
+                secretKeyRef:
+                  name: sail-chat-api-secrets
+                  key: BlobStorage__BaseUrl
+            - name: WebPubSub__ConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: sail-chat-api-secrets
+                  key: WebPubSub__ConnectionString
+            - name: Jwt__Authority
+              valueFrom:
+                secretKeyRef:
+                  name: sail-chat-api-secrets
+                  key: Jwt__Authority
           resources:
             limits:
               cpu: "0.49"
