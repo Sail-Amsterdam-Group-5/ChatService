@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sail-chat-api
+  namespace: oscar-dev
+  labels:
+    app: sail-chat-api
+spec:
+  replicas: 1  # Single instance
+  selector:
+    matchLabels:
+      app: sail-chat-api
+  template:
+    metadata:
+      labels:
+        app: sail-chat-api
+    spec:
+      containers:
+        - name: sail-chat-api
+          image: earlybirdreal/sail-chat-api:070a122255474cf8b6a38f93b47498f8fe3fc601
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          resources:
+            limits:
+              cpu: "0.49"
+              memory: "499Mi"
+            requests:
+              cpu: "0.2"
+              memory: "50Mi"
+      imagePullSecrets:
+      - name: regcred
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sail-chat-api-service
+  namespace: oscar-dev
+spec:
+  selector:
+    app: sail-chat-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: sail-chat-api-route
+  namespace: oscar-dev
+spec:
+  to:
+    kind: Service
+    name: sail-chat-api-service
+  port:
+    targetPort: 3000
