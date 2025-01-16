@@ -49,10 +49,10 @@ spec:
                   key: Jwt__Authority
           resources:
             limits:
-              cpu: "0.49"
+              cpu: "0.2"
               memory: "499Mi"
             requests:
-              cpu: "0.2"
+              cpu: "0.1"
               memory: "50Mi"
       imagePullSecrets:
       - name: regcred
