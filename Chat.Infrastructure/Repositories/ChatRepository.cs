@@ -17,12 +17,29 @@ public class ChatRepository : IChatRepository
 
     public async Task<ChatRoom> CreateChatAsync(ChatRoom chat)
     {
-        chat.Id = Guid.NewGuid().ToString();
-        chat.CreatedAt = DateTime.UtcNow;
-        chat.LastMessageAt = DateTime.UtcNow;
-        chat.IsActive = true;
+        try
+        {
+            chat.Id = Guid.NewGuid().ToString();
+            chat.CreatedAt = DateTime.UtcNow;
+            chat.LastMessageAt = DateTime.UtcNow;
+            chat.IsActive = true;
 
-        return await _container.CreateItemAsync(chat, new PartitionKey(chat.Id));
+            var response = await _container.CreateItemAsync(
+                chat,
+                new PartitionKey(chat.Id)
+            );
+            return response.Resource;
+        }
+        catch (CosmosException ex)
+        {
+            Console.WriteLine($"Cosmos DB Error: {ex.StatusCode} - {ex.Message}");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"General Error: {ex.Message}");
+            throw;
+        }
     }
 
     public async Task<ChatRoom?> GetChatByIdAsync(string chatId)

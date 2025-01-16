@@ -54,12 +54,6 @@ public class ChatService : IChatService
 
         var createdChat = await _chatRepository.CreateChatAsync(chatRoom);
 
-        // Add all participants to the WebPubSub group
-        foreach (var participant in chatRoom.Participants)
-        {
-            await _webPubSubService.AddUserToChatGroupAsync(participant.UserId, createdChat.Id);
-        }
-
         return createdChat.ToDto();
     }
 
