@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: sail-chat-api
-          image: earlybirdreal/sail-chat-api:5dad3750da07e1a2f80cd9a5ac51c650d2bb871a
+          image: earlybirdreal/sail-chat-api:dbd376d882db8954ec03fc1cdf1ce3bbf1feb4cc
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
