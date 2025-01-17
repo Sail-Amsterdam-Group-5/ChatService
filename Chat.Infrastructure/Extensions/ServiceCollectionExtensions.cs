@@ -34,8 +34,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<CosmosDbContext>();
 
         // Configure Blob Storage
-        //services.Configure<BlobStorageSettings>(
-        //configuration.GetSection("BlobStorage"));
         services.Configure<BlobStorageSettings>(options =>
             configuration.GetSection("BlobStorage").Bind(options));
 
