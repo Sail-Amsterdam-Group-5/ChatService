@@ -8,10 +8,14 @@ COPY ["Chat.Core/Chat.Core.csproj", "Chat.Core/"]
 COPY ["Chat.Infrastructure/Chat.Infrastructure.csproj", "Chat.Infrastructure/"]
 COPY ["Chat.Application/Chat.Application.csproj", "Chat.Application/"]
 COPY ["Chat.Infrastructure.Tests/Chat.Infrastructure.Tests.csproj", "Chat.Infrastructure.Tests/"]
+COPY ["Chat.Application.Tests/Chat.Application.Tests.csproj", "Chat.Application.Tests/"]
+COPY ["Chat.API.Tests/Chat.API.Tests.csproj", "Chat.API.Tests/"]
 
 # Restore dependencies
 RUN dotnet restore "Chat.API/Chat.API.csproj"
 RUN dotnet restore "Chat.Infrastructure.Tests/Chat.Infrastructure.Tests.csproj"
+RUN dotnet restore "Chat.Application.Tests/Chat.Application.Tests.csproj"
+RUN dotnet restore "Chat.API.Tests/Chat.API.Tests.csproj"
 
 # Copy the rest of the source code
 COPY . .
