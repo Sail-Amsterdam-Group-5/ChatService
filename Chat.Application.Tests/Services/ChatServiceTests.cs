@@ -19,6 +19,7 @@ namespace Chat.Application.Tests.Services
         private readonly Mock<IWebPubSubService> _webPubSubServiceMock;
         private readonly Mock<IBlobStorageService> _blobStorageServiceMock;
         private readonly Mock<IDeletedMessageService> _deletedMessageServiceMock;
+        private readonly Mock<MetricsService> _metricsServiceMock;
         private readonly ILogger<MessageService> _loggerMock;
         private readonly MessageService _messageService;
         private readonly ChatService _chatService;
@@ -30,6 +31,7 @@ namespace Chat.Application.Tests.Services
             _webPubSubServiceMock = new Mock<IWebPubSubService>();
             _blobStorageServiceMock = new Mock<IBlobStorageService>();
             _deletedMessageServiceMock = new Mock<IDeletedMessageService>();
+            _metricsServiceMock = new Mock<MetricsService>();
             _loggerMock = Mock.Of<ILogger<MessageService>>();
 
             _messageService = new MessageService(
@@ -38,9 +40,12 @@ namespace Chat.Application.Tests.Services
                 _webPubSubServiceMock.Object,
                 _blobStorageServiceMock.Object,
                 _deletedMessageServiceMock.Object,
+                _metricsServiceMock.Object,
                 _loggerMock);
 
-            _chatService = new ChatService(_chatRepositoryMock.Object, _webPubSubServiceMock.Object);
+            _chatService = new ChatService(
+                _chatRepositoryMock.Object,
+                _webPubSubServiceMock.Object);
         }
 
         [Fact]
