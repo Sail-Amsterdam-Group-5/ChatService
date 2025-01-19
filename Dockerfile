@@ -7,12 +7,25 @@ COPY ["Chat.API/Chat.API.csproj", "Chat.API/"]
 COPY ["Chat.Core/Chat.Core.csproj", "Chat.Core/"]
 COPY ["Chat.Infrastructure/Chat.Infrastructure.csproj", "Chat.Infrastructure/"]
 COPY ["Chat.Application/Chat.Application.csproj", "Chat.Application/"]
+COPY ["Chat.Infrastructure.Tests/Chat.Infrastructure.Tests.csproj", "Chat.Infrastructure.Tests/"]
 
 # Restore dependencies
 RUN dotnet restore "Chat.API/Chat.API.csproj"
+RUN dotnet restore "Chat.Infrastructure.Tests/Chat.Infrastructure.Tests.csproj"
 
 # Copy the rest of the source code
 COPY . .
+
+# Run tests with environment variables
+ENV CosmosDb__ConnectionString="dummy-connection-string" \
+    CosmosDb__DatabaseName="test-db" \
+    CosmosDb__MessagesContainer="Messages" \
+    CosmosDb__ChatsContainer="Chats" \
+    CosmosDb__DevicesContainer="Devices" \
+    CosmosDb__DeletedMessagesContainer="DeletedMessages"
+
+# Run tests
+RUN dotnet test --no-restore --verbosity normal
 
 # Build the application
 RUN dotnet build "Chat.API/Chat.API.csproj" -c Release -o /app/build

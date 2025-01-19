@@ -53,7 +53,14 @@ jobs:
       run: dotnet build --no-restore --configuration Release
 
     - name: Run tests
-      run: dotnet test --no-build --verbosity normal
+      run: dotnet test --no-build --verbosity normal --logger "console;verbosity=detailed" /p:CollectCoverage=true /p:CoverletOutputFormat=opencover
+      env:
+        CosmosDb__ConnectionString: "dummy-connection-string"
+        CosmosDb__DatabaseName: "test-db"
+        CosmosDb__MessagesContainer: "Messages"
+        CosmosDb__ChatsContainer: "Chats"
+        CosmosDb__DevicesContainer: "Devices"
+        CosmosDb__DeletedMessagesContainer: "DeletedMessages"
 
   # Deployment Job
   deploy:
