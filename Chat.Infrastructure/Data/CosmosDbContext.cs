@@ -2,7 +2,7 @@
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Options;
 using System.Runtime.CompilerServices;
-[assembly: InternalsVisibleTo("Chat.Infrastructure.Tests")] // Allow access to internal members for testing.
+[assembly: InternalsVisibleTo("Chat.Infrastructure.Tests")] // Allow access to internal members for testing..
 
 namespace Chat.Infrastructure.Data;
 

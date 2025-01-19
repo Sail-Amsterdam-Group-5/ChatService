@@ -52,6 +52,13 @@ jobs:
     - name: Build project
       run: dotnet build --no-restore --configuration Release
 
+    - name: Check test files
+      run: |
+        echo "Checking test files..."
+        ls -l Chat.Infrastructure.Tests/bin/Debug/net8.0/ || echo "Infrastructure tests not found"
+        ls -l Chat.Application.Tests/bin/Debug/net8.0/ || echo "Application tests not found"
+        ls -l Chat.API.Tests/bin/Debug/net8.0/ || echo "API tests not found" 
+  
     - name: Run tests
       run: dotnet test ChatService.sln --no-build --verbosity normal
       env:
