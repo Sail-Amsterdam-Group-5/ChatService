@@ -2,10 +2,11 @@
 using Chat.Application.DTOs;
 using Chat.Application.Exceptions;
 using Chat.Application.Interfaces;
+using Chat.Application.Policies;
 using Chat.Core.Interfaces;
 using Chat.Core.Models;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
+using Polly;
 
 namespace Chat.Application.Services;
 
@@ -17,6 +18,9 @@ public class MessageService : IMessageService
     private readonly IBlobStorageService _blobStorageService;
     private readonly IDeletedMessageService _deletedMessageService;
     private readonly ILogger<MessageService> _logger;
+    private readonly IAsyncPolicy<MessageDto> _messagePolicy;
+    private readonly IAsyncPolicy<bool> _deletePolicy;
+    private readonly MetricsService _metrics;
     private const int MESSAGE_DELETE_WINDOW_MINUTES = 5;
 
     public MessageService(
@@ -25,6 +29,7 @@ public class MessageService : IMessageService
         IWebPubSubService webPubSubService,
         IBlobStorageService blobStorageService,
         IDeletedMessageService deletedMessageService,
+        MetricsService metrics,
         ILogger<MessageService> logger)
     {
         _messageRepository = messageRepository;
@@ -32,66 +37,80 @@ public class MessageService : IMessageService
         _webPubSubService = webPubSubService;
         _blobStorageService = blobStorageService;
         _deletedMessageService = deletedMessageService;
+        _metrics = metrics;
         _logger = logger;
+
+        // Initialize policies
+        _messagePolicy = MessagePolicies.GetRetryPolicy<MessageDto>()
+            .WrapAsync(MessagePolicies.GetTimeoutPolicy<MessageDto>());
+
+        _deletePolicy = MessagePolicies.GetRetryPolicy<bool>()
+            .WrapAsync(MessagePolicies.GetTimeoutPolicy<bool>());
     }
 
     public async Task<MessageDto> SendMessageAsync(CreateMessageDto createMessageDto, string senderId)
     {
-        var chat = await _chatRepository.GetChatByIdAsync(createMessageDto.ChatId);
-        if (chat == null)
-            throw new ChatNotFoundException(createMessageDto.ChatId);
-
-        if (!chat.IsActive)
-            throw new InvalidOperationChatException("Cannot send messages to inactive chat.");
-
-        var participant = chat.Participants.FirstOrDefault(p => p.UserId == senderId);
-        if (participant == null)
-            throw new UnauthorizedChatAccessException(senderId, createMessageDto.ChatId);
-
-        var message = new ChatMessage
+        return await _messagePolicy.ExecuteAsync(async () =>
         {
-            ChatId = createMessageDto.ChatId,
-            SenderId = senderId,
-            Type = createMessageDto.Type,
-            Content = new MessageContent()
-        };
+            using var timer = _metrics.BeginMessageProcessing();
+            var chat = await _chatRepository.GetChatByIdAsync(createMessageDto.ChatId);
+            if (chat == null)
+                throw new ChatNotFoundException(createMessageDto.ChatId);
 
-        if (createMessageDto.Type == "image" && createMessageDto.ImageFile != null)
-        {
-            if (!_blobStorageService.IsValidImage(createMessageDto.ImageFile.ContentType, createMessageDto.ImageFile.Length))
+            if (!chat.IsActive)
+                throw new InvalidOperationChatException("Cannot send messages to inactive chat.");
+
+            var participant = chat.Participants.FirstOrDefault(p => p.UserId == senderId);
+            if (participant == null)
+                throw new UnauthorizedChatAccessException(senderId, createMessageDto.ChatId);
+
+            var message = new ChatMessage
             {
-                throw new InvalidOperationChatException("Invalid image file. Must be jpg, png, or gif under 5MB.");
+                ChatId = createMessageDto.ChatId,
+                SenderId = senderId,
+                Type = createMessageDto.Type,
+                Content = new MessageContent()
+            };
+
+            if (createMessageDto.Type == "image" && createMessageDto.ImageFile != null)
+            {
+                if (!_blobStorageService.IsValidImage(createMessageDto.ImageFile.ContentType, createMessageDto.ImageFile.Length))
+                {
+                    throw new InvalidOperationChatException("Invalid image file. Must be jpg, png, or gif under 5MB.");
+                }
+
+                using var stream = createMessageDto.ImageFile.OpenReadStream();
+                var (imageUrl, size, contentType) = await _blobStorageService.UploadImageAsync(
+                    stream,
+                    createMessageDto.ImageFile.ContentType,
+                    createMessageDto.ImageFile.FileName);
+
+                message.Content.ImageUrl = imageUrl;
+                message.Content.ImageSize = size;
+                message.Content.ImageMimeType = contentType;
+            }
+            else if (createMessageDto.Type == "text")
+            {
+                message.Content.Text = createMessageDto.Content.Text;
+            }
+            else
+            {
+                throw new InvalidOperationChatException("Invalid message type");
             }
 
-            using var stream = createMessageDto.ImageFile.OpenReadStream();
-            var (imageUrl, size, contentType) = await _blobStorageService.UploadImageAsync(
-                stream,
-                createMessageDto.ImageFile.ContentType,
-                createMessageDto.ImageFile.FileName);
+            var createdMessage = await _messageRepository.CreateMessageAsync(message);
+            await _chatRepository.UpdateLastMessageTimeAsync(createMessageDto.ChatId, createdMessage.CreatedAt);
 
-            message.Content.ImageUrl = imageUrl;
-            message.Content.ImageSize = size;
-            message.Content.ImageMimeType = contentType;
-        }
-        else if (createMessageDto.Type == "text")
-        {
-            message.Content.Text = createMessageDto.Content.Text;
-        }
-        else
-        {
-            throw new InvalidOperationChatException("Invalid message type");
-        }
+            await _webPubSubService.SendMessageToChatAsync(createMessageDto.ChatId, new
+            {
+                type = "message",
+                data = createdMessage.ToDto()
+            });
 
-        var createdMessage = await _messageRepository.CreateMessageAsync(message);
-        await _chatRepository.UpdateLastMessageTimeAsync(createMessageDto.ChatId, createdMessage.CreatedAt);
+            _metrics.IncrementMessagesSent();
 
-        await _webPubSubService.SendMessageToChatAsync(createMessageDto.ChatId, new
-        {
-            type = "message",
-            data = createdMessage.ToDto()
+            return createdMessage.ToDto();
         });
-
-        return createdMessage.ToDto();
     }
 
     public async Task<IEnumerable<MessageDto>> GetNewMessagesAsync(string chatId, DateTime lastSyncTimestamp)
@@ -133,31 +152,36 @@ public class MessageService : IMessageService
 
     public async Task<bool> DeleteMessageAsync(string messageId, string chatId, string userId)
     {
-        var message = await _messageRepository.GetMessageByIdAsync(messageId, chatId);
-        if (message == null)
-            throw new MessageNotFoundException(messageId);
 
-        if (message.CreatedAt < DateTime.UtcNow.AddMinutes(-15))
-            throw new InvalidOperationChatException("Messages can only be deleted within 15 minutes of sending.");
-
-        var chat = await _chatRepository.GetChatByIdAsync(chatId);
-        var isAdmin = chat?.Participants.Any(p => p.UserId == userId && p.Role == "admin") ?? false;
-        if (message.SenderId != userId && !isAdmin)
-            throw new UnauthorizedChatAccessException(userId, chatId);
-
-        var success = await _messageRepository.DeleteMessageAsync(messageId, chatId);
-
-        if (success && message.Type == "image" && !string.IsNullOrEmpty(message.Content.ImageUrl))
+        return await _deletePolicy.ExecuteAsync(async () =>
         {
-            await _blobStorageService.DeleteImageAsync(message.Content.ImageUrl);
-            await _webPubSubService.SendMessageToChatAsync(chatId, new
-            {
-                type = "message-deleted",
-                data = new { messageId, chatId, deletedAt = DateTime.UtcNow }
-            });
-        }
+            var message = await _messageRepository.GetMessageByIdAsync(messageId, chatId);
+            if (message == null)
+                throw new MessageNotFoundException(messageId);
 
-        return success;
+            if (message.CreatedAt < DateTime.UtcNow.AddMinutes(-15))
+                throw new InvalidOperationChatException("Messages can only be deleted within 15 minutes of sending.");
+
+            var chat = await _chatRepository.GetChatByIdAsync(chatId);
+            var isAdmin = chat?.Participants.Any(p => p.UserId == userId && p.Role == "admin") ?? false;
+            if (message.SenderId != userId && !isAdmin)
+                throw new UnauthorizedChatAccessException(userId, chatId);
+
+            var success = await _messageRepository.DeleteMessageAsync(messageId, chatId);
+
+            if (success && message.Type == "image" && !string.IsNullOrEmpty(message.Content.ImageUrl))
+            {
+                await _blobStorageService.DeleteImageAsync(message.Content.ImageUrl);
+                await _webPubSubService.SendMessageToChatAsync(chatId, new
+                {
+                    type = "message-deleted",
+                    data = new { messageId, chatId, deletedAt = DateTime.UtcNow }
+                });
+                _metrics.IncrementMessagesDeleted();
+            }
+
+            return success;
+        });
     }
 
     public async Task<IEnumerable<MessageDto>> GetRecentMessagesAsync(string chatId, int limit = 50)

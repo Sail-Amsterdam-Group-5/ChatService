@@ -1,6 +1,7 @@
 using Chat.API.Extensions;
 using Chat.Infrastructure.Extensions;
 using Microsoft.OpenApi.Models;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -87,5 +88,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Observability
+app.UseMetricServer();   // Exposes /metrics endpoint
+app.UseHttpMetrics();    // Adds basic HTTP metrics
 
 app.Run();

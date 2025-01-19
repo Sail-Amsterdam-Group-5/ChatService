@@ -33,6 +33,9 @@ public static class ServiceCollectionExtensions
         // Register CosmosDB context
         services.AddSingleton<CosmosDbContext>();
 
+        // Register Metrics service
+        services.AddSingleton<MetricsService>();
+
         // Configure Blob Storage
         services.Configure<BlobStorageSettings>(options =>
             configuration.GetSection("BlobStorage").Bind(options));
