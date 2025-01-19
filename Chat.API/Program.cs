@@ -70,6 +70,10 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Test metric at startup
+var startupCounter = Metrics.CreateCounter("chat_startup_counter", "Counter incremented at startup");
+startupCounter.Inc();
+
 // Configure the HTTP request pipeline.
 //if (app.Environment.IsDevelopment())
 //{
@@ -79,18 +83,19 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
+app.UseRouting();
+
 app.UseHttpsRedirection();
 
 // Use CORS before auth
 app.UseCors("AllowAll");
 
+app.UseHttpMetrics(); // Must come after UseRouting but before UseEndpoints
+app.UseMetricServer(); // Exposes the /metrics endpoint
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
-// Observability
-app.UseMetricServer();   // Exposes /metrics endpoint
-app.UseHttpMetrics();    // Adds basic HTTP metrics
 
 app.Run();
