@@ -1,6 +1,8 @@
 ﻿using Chat.Infrastructure.Configuration;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Options;
+using System.Runtime.CompilerServices;
+[assembly: InternalsVisibleTo("Chat.Infrastructure.Tests")]
 
 namespace Chat.Infrastructure.Data;
 
@@ -8,6 +10,10 @@ public class CosmosDbContext
 {
     private readonly CosmosClient _client;
     private readonly string _databaseName;
+    private readonly string _messagesContainer;
+    private readonly string _chatsContainer;
+    private readonly string _devicesContainer;
+    private readonly string _deletedMessagesContainer;
 
     public Container Messages { get; private set; }
     public Container Chats { get; private set; }
@@ -18,38 +24,57 @@ public class CosmosDbContext
     {
         _client = new CosmosClient(settings.Value.ConnectionString);
         _databaseName = settings.Value.DatabaseName;
+        _messagesContainer = settings.Value.MessagesContainer;
+        _chatsContainer = settings.Value.ChatsContainer;
+        _devicesContainer = settings.Value.DevicesContainer;
+        _deletedMessagesContainer = settings.Value.DeletedMessagesContainer;
 
-        // Create database if it doesn't exist
-        var database = _client.CreateDatabaseIfNotExistsAsync(_databaseName)
-            .GetAwaiter()
-            .GetResult()
-            .Database;
+        InitializeContainers().GetAwaiter().GetResult();
+    }
 
-        // Create containers with correct partition key paths
-        Messages = database.CreateContainerIfNotExistsAsync(
+    // Constructor for testing
+    internal CosmosDbContext(
+        CosmosClient client,
+        Container messages,
+        Container chats,
+        Container devices,
+        Container deletedMessages)
+    {
+        _client = client;
+        Messages = messages;
+        Chats = chats;
+        Devices = devices;
+        DeletedMessages = deletedMessages;
+    }
+
+    private async Task InitializeContainers()
+    {
+        var database = await _client.CreateDatabaseIfNotExistsAsync(_databaseName);
+
+        Messages = await database.Database.CreateContainerIfNotExistsAsync(
             new ContainerProperties
             {
-                Id = settings.Value.MessagesContainer,
+                Id = _messagesContainer,
                 PartitionKeyPath = "/chatId"
-            }).GetAwaiter().GetResult();
+            });
 
-        Chats = database.CreateContainerIfNotExistsAsync(
+        Chats = await database.Database.CreateContainerIfNotExistsAsync(
             new ContainerProperties
             {
-                Id = settings.Value.ChatsContainer,
+                Id = _chatsContainer,
                 PartitionKeyPath = "/id"
-            }).GetAwaiter().GetResult();
+            });
 
-        Devices = database.CreateContainerIfNotExistsAsync(
+        Devices = await database.Database.CreateContainerIfNotExistsAsync(
             new ContainerProperties
             {
-                Id = settings.Value.DevicesContainer,
+                Id = _devicesContainer,
                 PartitionKeyPath = "/userId"
-            }).GetAwaiter().GetResult();
+            });
 
-        DeletedMessages = database.CreateContainerIfNotExistsAsync(
-            settings.Value.DeletedMessagesContainer,
+        DeletedMessages = await database.Database.CreateContainerIfNotExistsAsync(
+            _deletedMessagesContainer,
             "/chatId"
-        ).GetAwaiter().GetResult();
+        );
     }
 }

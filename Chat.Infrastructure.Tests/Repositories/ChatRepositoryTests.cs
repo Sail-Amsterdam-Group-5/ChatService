@@ -7,38 +7,31 @@ using Xunit;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 using Chat.Infrastructure.Configuration;
+using System.Linq.Expressions;
 
 namespace Chat.Infrastructure.Tests.Repositories
 {
     public class ChatRepositoryTests
     {
         private readonly Mock<Container> _containerMock;
-        private readonly Mock<CosmosDbContext> _contextMock;
+        private readonly CosmosDbContext _context;
         private readonly ChatRepository _repository;
-        private readonly Mock<FeedIterator<ChatRoom>> _feedIteratorMock;
-        private readonly Mock<IQueryable<ChatRoom>> _queryableMock;
 
         public ChatRepositoryTests()
         {
-            // Setup basic mocks
+            // Setup container mock
             _containerMock = new Mock<Container>();
-            _contextMock = new Mock<CosmosDbContext>();
-            _feedIteratorMock = new Mock<FeedIterator<ChatRoom>>();
-            _queryableMock = new Mock<IQueryable<ChatRoom>>();
 
-            // Setup context
-            var contextMock = new Mock<CosmosDbContext>();
-            contextMock.Setup(x => x.Chats).Returns(_containerMock.Object);
+            // Create context with mocked containers
+            _context = new CosmosDbContext(
+                new Mock<CosmosClient>().Object,
+                new Mock<Container>().Object,
+                _containerMock.Object,  // Chats container
+                new Mock<Container>().Object,
+                new Mock<Container>().Object
+            );
 
-            // Setup queryable
-            //_containerMock.Setup(c => c.GetItemLinqQueryable<ChatRoom>(
-            //    It.IsAny<bool>(),
-            //    It.IsAny<string>(),
-            //    It.IsAny<QueryRequestOptions>(),
-            //    It.IsAny<CosmosLinqSerializerOptions>()))
-            //    .Returns((IOrderedQueryable<ChatRoom>)_queryableMock.Object);
-
-            _repository = new ChatRepository(_contextMock.Object);
+            _repository = new ChatRepository(_context);
         }
 
         [Fact]
@@ -51,26 +44,66 @@ namespace Chat.Infrastructure.Tests.Repositories
                 Name = "Test Group",
                 CreatedBy = "user1",
                 Participants = new List<ChatParticipant>
-            {
-                new() { UserId = "user1", Role = "admin" }
-            }
+               {
+                   new() { UserId = "user1", Role = "admin" }
+               }
             };
-
-            var itemResponse = new Mock<ItemResponse<ChatRoom>>();
-            itemResponse.Setup(r => r.Resource).Returns(chat);
 
             _containerMock.Setup(c => c.CreateItemAsync(
                 It.IsAny<ChatRoom>(),
                 It.IsAny<PartitionKey>(),
-                null,
-                default))
-                .ReturnsAsync(itemResponse.Object);
+                It.IsAny<ItemRequestOptions>(),
+                It.IsAny<CancellationToken>()))
+                .ReturnsAsync((ChatRoom c, PartitionKey pk, ItemRequestOptions o, CancellationToken t) =>
+                {
+                    var response = new Mock<ItemResponse<ChatRoom>>();
+                    response.Setup(r => r.Resource).Returns(c);
+                    return response.Object;
+                });
 
             // Act
             var result = await _repository.CreateChatAsync(chat);
 
             // Assert
             result.Should().NotBeNull();
+            result.Id.Should().NotBeNullOrEmpty();
+            result.Type.Should().Be("group");
+            result.Name.Should().Be("Test Group");
+            result.CreatedBy.Should().Be("user1");
+            result.Participants.Should().HaveCount(1);
+            result.Participants.First().Role.Should().Be("admin");
+        }
+
+        [Fact]
+        public async Task GetChatByIdAsync_ExistingChat_ReturnsChat()
+        {
+            // Arrange
+            var chatId = "chat1";
+            var chat = new ChatRoom
+            {
+                Id = chatId,
+                Type = "group",
+                Name = "Test Group"
+            };
+
+            _containerMock.Setup(c => c.ReadItemAsync<ChatRoom>(
+                chatId,
+                It.IsAny<PartitionKey>(),
+                It.IsAny<ItemRequestOptions>(),
+                It.IsAny<CancellationToken>()))
+                .ReturnsAsync((string id, PartitionKey pk, ItemRequestOptions o, CancellationToken t) =>
+                {
+                    var response = new Mock<ItemResponse<ChatRoom>>();
+                    response.Setup(r => r.Resource).Returns(chat);
+                    return response.Object;
+                });
+
+            // Act
+            var result = await _repository.GetChatByIdAsync(chatId);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Id.Should().Be(chatId);
             result.Type.Should().Be("group");
             result.Name.Should().Be("Test Group");
         }
