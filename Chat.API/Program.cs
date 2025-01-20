@@ -18,17 +18,8 @@ builder.Services.AddLogging(logging =>
 // Add services to the container.
 builder.Services.AddControllers();
 
-builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
-
-var useHeaderAuth = builder.Configuration.GetValue<bool>("UseHeaderAuthentication");
-if (useHeaderAuth)
-{
-    builder.Services.AddHeaderAuthentication();
-}
-else
-{
-    builder.Services.AddJwtAuthentication(builder.Configuration);
-}
+// Add JWT Authentication
+builder.Services.AddJwtAuthentication(builder.Configuration);
 
 // Add Infrastructure services (WebPubSub, CosmosDB)
 builder.Services.AddInfrastructureServices(builder.Configuration);
@@ -39,64 +30,15 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Chat API", Version = "v1" });
 
-    if (useHeaderAuth)
+    // Add JWT Authentication
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        // Add security definitions for headers
-        c.AddSecurityDefinition("UserHeaders", new OpenApiSecurityScheme
-        {
-            Type = SecuritySchemeType.ApiKey,
-            Name = "X-User-Id",
-            In = ParameterLocation.Header,
-            Description = "User ID Header"
-        });
-
-        c.AddSecurityDefinition("RoleHeaders", new OpenApiSecurityScheme
-        {
-            Type = SecuritySchemeType.ApiKey,
-            Name = "X-User-Roles",
-            In = ParameterLocation.Header,
-            Description = "User Roles Header (comma-separated)"
-        });
-
-        // Apply security requirements globally
-        c.AddSecurityRequirement(new OpenApiSecurityRequirement
-        {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference
-                    {
-                        Type = ReferenceType.SecurityScheme,
-                        Id = "UserHeaders"
-                    }
-                },
-                Array.Empty<string>()
-            },
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference
-                    {
-                        Type = ReferenceType.SecurityScheme,
-                        Id = "RoleHeaders"
-                    }
-                },
-                Array.Empty<string>()
-            }
-        });
-    }
-    else
-    {
-        // Add JWT Authentication as backup
-        c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-        {
-            Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
-            Name = "Authorization",
-            In = ParameterLocation.Header,
-            Type = SecuritySchemeType.ApiKey,
-            Scheme = "Bearer"
-        });
-    }
+        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
 
     c.AddSecurityRequirement(new OpenApiSecurityRequirement()
     {
@@ -132,6 +74,12 @@ var app = builder.Build();
 var startupCounter = Metrics.CreateCounter("chat_startup_counter", "Counter incremented at startup");
 startupCounter.Inc();
 
+// Configure the HTTP request pipeline.
+//if (app.Environment.IsDevelopment())
+//{
+//    app.UseSwagger();
+//    app.UseSwaggerUI();
+//}
 app.UseSwagger();
 app.UseSwaggerUI();
 

@@ -61,6 +61,14 @@ public class MessageRepository : IMessageRepository
     {
         try
         {
+            //var message = await GetMessageByIdAsync(messageId, chatId);
+            //if (message == null) return false;
+
+            //// Soft delete
+            //message.IsDeleted = true;
+            //await _container.UpsertItemAsync(message, new PartitionKey(chatId));
+            //return true;
+            // Hard delete - completely remove the message
             await _container.DeleteItemAsync<ChatMessage>(
                 messageId,
                 new PartitionKey(chatId));

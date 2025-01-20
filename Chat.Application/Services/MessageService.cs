@@ -7,7 +7,6 @@ using Chat.Core.Interfaces;
 using Chat.Core.Models;
 using Microsoft.Extensions.Logging;
 using Polly;
-using Polly.RateLimit;
 
 namespace Chat.Application.Services;
 
@@ -49,87 +48,69 @@ public class MessageService : IMessageService
             .WrapAsync(MessagePolicies.GetTimeoutPolicy<bool>());
     }
 
-    private IAsyncPolicy<MessageDto> GetCombinedPolicy(string userId)
-    {
-        return Policy.WrapAsync(
-            MessagePolicies.GetRateLimitPolicy(userId),
-            MessagePolicies.GetRetryPolicy<MessageDto>(),
-            MessagePolicies.GetTimeoutPolicy<MessageDto>());
-    }
-
     public async Task<MessageDto> SendMessageAsync(CreateMessageDto createMessageDto, string senderId)
     {
-        try
+        return await _messagePolicy.ExecuteAsync(async () =>
         {
-            return await GetCombinedPolicy(senderId).ExecuteAsync(async () =>
+            using var timer = _metrics.BeginMessageProcessing();
+            var chat = await _chatRepository.GetChatByIdAsync(createMessageDto.ChatId);
+            if (chat == null)
+                throw new ChatNotFoundException(createMessageDto.ChatId);
+
+            if (!chat.IsActive)
+                throw new InvalidOperationChatException("Cannot send messages to inactive chat.");
+
+            var participant = chat.Participants.FirstOrDefault(p => p.UserId == senderId);
+            if (participant == null)
+                throw new UnauthorizedChatAccessException(senderId, createMessageDto.ChatId);
+
+            var message = new ChatMessage
             {
-                return await _messagePolicy.ExecuteAsync(async () =>
+                ChatId = createMessageDto.ChatId,
+                SenderId = senderId,
+                Type = createMessageDto.Type,
+                Content = new MessageContent()
+            };
+
+            if (createMessageDto.Type == "image" && createMessageDto.ImageFile != null)
+            {
+                if (!_blobStorageService.IsValidImage(createMessageDto.ImageFile.ContentType, createMessageDto.ImageFile.Length))
                 {
-                    using var timer = _metrics.BeginMessageProcessing();
-                    var chat = await _chatRepository.GetChatByIdAsync(createMessageDto.ChatId);
-                    if (chat == null)
-                        throw new ChatNotFoundException(createMessageDto.ChatId);
+                    throw new InvalidOperationChatException("Invalid image file. Must be jpg, png, or gif under 5MB.");
+                }
 
-                    if (!chat.IsActive)
-                        throw new InvalidOperationChatException("Cannot send messages to inactive chat.");
+                using var stream = createMessageDto.ImageFile.OpenReadStream();
+                var (imageUrl, size, contentType) = await _blobStorageService.UploadImageAsync(
+                    stream,
+                    createMessageDto.ImageFile.ContentType,
+                    createMessageDto.ImageFile.FileName);
 
-                    var participant = chat.Participants.FirstOrDefault(p => p.UserId == senderId);
-                    if (participant == null)
-                        throw new UnauthorizedChatAccessException(senderId, createMessageDto.ChatId);
+                message.Content.ImageUrl = imageUrl;
+                message.Content.ImageSize = size;
+                message.Content.ImageMimeType = contentType;
+            }
+            else if (createMessageDto.Type == "text")
+            {
+                message.Content.Text = createMessageDto.Content.Text;
+            }
+            else
+            {
+                throw new InvalidOperationChatException("Invalid message type");
+            }
 
-                    var message = new ChatMessage
-                    {
-                        ChatId = createMessageDto.ChatId,
-                        SenderId = senderId,
-                        Type = createMessageDto.Type,
-                        Content = new MessageContent()
-                    };
+            var createdMessage = await _messageRepository.CreateMessageAsync(message);
+            await _chatRepository.UpdateLastMessageTimeAsync(createMessageDto.ChatId, createdMessage.CreatedAt);
 
-                    if (createMessageDto.Type == "image" && createMessageDto.ImageFile != null)
-                    {
-                        if (!_blobStorageService.IsValidImage(createMessageDto.ImageFile.ContentType, createMessageDto.ImageFile.Length))
-                        {
-                            throw new InvalidOperationChatException("Invalid image file. Must be jpg, png, or gif under 5MB.");
-                        }
-
-                        using var stream = createMessageDto.ImageFile.OpenReadStream();
-                        var (imageUrl, size, contentType) = await _blobStorageService.UploadImageAsync(
-                            stream,
-                            createMessageDto.ImageFile.ContentType,
-                            createMessageDto.ImageFile.FileName);
-
-                        message.Content.ImageUrl = imageUrl;
-                        message.Content.ImageSize = size;
-                        message.Content.ImageMimeType = contentType;
-                    }
-                    else if (createMessageDto.Type == "text")
-                    {
-                        message.Content.Text = createMessageDto.Content.Text;
-                    }
-                    else
-                    {
-                        throw new InvalidOperationChatException("Invalid message type");
-                    }
-
-                    var createdMessage = await _messageRepository.CreateMessageAsync(message);
-                    await _chatRepository.UpdateLastMessageTimeAsync(createMessageDto.ChatId, createdMessage.CreatedAt);
-
-                    await _webPubSubService.SendMessageToChatAsync(createMessageDto.ChatId, new
-                    {
-                        type = "message",
-                        data = createdMessage.ToDto()
-                    });
-
-                    _metrics.IncrementMessagesSent();
-
-                    return createdMessage.ToDto();
-                });
+            await _webPubSubService.SendMessageToChatAsync(createMessageDto.ChatId, new
+            {
+                type = "message",
+                data = createdMessage.ToDto()
             });
-        }
-        catch (RateLimitRejectedException)
-        {
-            throw new ChatException("You are sending messages too quickly. Please wait a moment.");
-        }
+
+            _metrics.IncrementMessagesSent();
+
+            return createdMessage.ToDto();
+        });
     }
 
     public async Task<IEnumerable<MessageDto>> GetNewMessagesAsync(string chatId, DateTime lastSyncTimestamp)
@@ -191,15 +172,6 @@ public class MessageService : IMessageService
             if (success && message.Type == "image" && !string.IsNullOrEmpty(message.Content.ImageUrl))
             {
                 await _blobStorageService.DeleteImageAsync(message.Content.ImageUrl);
-                await _webPubSubService.SendMessageToChatAsync(chatId, new
-                {
-                    type = "message-deleted",
-                    data = new { messageId, chatId, deletedAt = DateTime.UtcNow }
-                });
-                _metrics.IncrementMessagesDeleted();
-            }
-            else if (success && message.Type == "text")
-            {
                 await _webPubSubService.SendMessageToChatAsync(chatId, new
                 {
                     type = "message-deleted",

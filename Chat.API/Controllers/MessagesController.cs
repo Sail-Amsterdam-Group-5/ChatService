@@ -36,6 +36,7 @@ public class MessagesController : ControllerBase
     {
         try
         {
+            // Verify user is a participant in the chat
             var chat = await _chatService.GetChatByIdAsync(chatId);
             if (chat == null)
                 return NotFound("Chat not found");
@@ -142,6 +143,17 @@ public class MessagesController : ControllerBase
         }
     }
 
+    [HttpGet("metrics/system")]
+    [Authorize(Roles = "admin")] // Updated to match Keycloak role
+    public async Task<IActionResult> GetSystemMetrics()
+    {
+        // TODO: Implement metrics collection
+        return Ok(new
+        {
+            message = "Metrics functionality will be implemented later"
+        });
+    }
+
     [HttpGet("{chatId}/sync")]
     public async Task<IActionResult> GetNewMessages(
         string chatId,
@@ -149,6 +161,7 @@ public class MessagesController : ControllerBase
     {
         try
         {
+            // Verify user is a participant in the chat
             var chat = await _chatService.GetChatByIdAsync(chatId);
             if (chat == null)
                 return NotFound("Chat not found");
@@ -172,6 +185,7 @@ public class MessagesController : ControllerBase
     {
         try
         {
+            // Verify user is a participant in the chat
             var chat = await _chatService.GetChatByIdAsync(chatId);
             if (chat == null)
                 return NotFound("Chat not found");
@@ -196,6 +210,7 @@ public class MessagesController : ControllerBase
     {
         try
         {
+            // Verify user is a participant in the chat
             var chat = await _chatService.GetChatByIdAsync(chatId);
             if (chat == null)
                 return NotFound("Chat not found");

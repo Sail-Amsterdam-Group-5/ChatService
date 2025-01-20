@@ -27,10 +27,10 @@ public static class AuthenticationExtensions
             options.RequireHttpsMetadata = false;
             options.TokenValidationParameters = new TokenValidationParameters
             {
-                ValidateIssuer = false,
-                ValidateAudience = false,
-                ValidateLifetime = false,
-                ValidateIssuerSigningKey = false,
+                ValidateIssuer = false, // true on prod
+                ValidateAudience = false, // true on prod
+                ValidateLifetime = false, // true on prod
+                ValidateIssuerSigningKey = false, // true on prod
             };
 
             options.Events = new JwtBearerEvents
