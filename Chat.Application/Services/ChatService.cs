@@ -64,6 +64,17 @@ public class ChatService : IChatService
             throw new InvalidOperationChatException("Cannot create direct message chat with yourself.");
         }
 
+        var existingChats = await _chatRepository.GetUserChatsAsync(userId, "individual");
+        var existingDM = existingChats.FirstOrDefault(c =>
+            c.Type == "individual" &&
+            c.Participants.Count == 2 &&
+            c.Participants.Any(p => p.UserId == otherUserId));
+
+        if (existingDM != null)
+        {
+            throw new InvalidOperationChatException("Direct message chat already exists with this user.");
+        }
+
         var chatRoom = new ChatRoom
         {
             Type = "individual",

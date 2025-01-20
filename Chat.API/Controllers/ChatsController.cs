@@ -36,7 +36,6 @@ public class ChatsController : ControllerBase
             if (chat == null)
                 return NotFound();
 
-            // Verify user is a participant
             if (!chat.Participants.Any(p => p.UserId == UserId))
                 return Forbid();
 
@@ -56,6 +55,10 @@ public class ChatsController : ControllerBase
             ChatDto chat;
             if (createChatDto.Type == "group")
             {
+                if (!IsAdmin)
+                {
+                    return Forbid("Only administrators can create group chats.");
+                }
                 chat = await _chatService.CreateGroupChatAsync(createChatDto, UserId);
             }
             else if (createChatDto.Type == "individual")
@@ -97,7 +100,6 @@ public class ChatsController : ControllerBase
     {
         try
         {
-            // Verify current user is admin
             var chat = await _chatService.GetChatByIdAsync(chatId);
             if (chat == null)
                 return NotFound();
@@ -119,7 +121,6 @@ public class ChatsController : ControllerBase
     {
         try
         {
-            // Verify current user is admin
             var chat = await _chatService.GetChatByIdAsync(chatId);
             if (chat == null)
                 return NotFound();
@@ -141,7 +142,6 @@ public class ChatsController : ControllerBase
     {
         try
         {
-            // Verify current user is admin
             var chat = await _chatService.GetChatByIdAsync(chatId);
             if (chat == null)
                 return NotFound();
@@ -163,7 +163,6 @@ public class ChatsController : ControllerBase
     {
         try
         {
-            // Verify current user is admin
             var chat = await _chatService.GetChatByIdAsync(chatId);
             if (chat == null)
                 return NotFound();
