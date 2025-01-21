@@ -64,6 +64,17 @@ public class ChatService : IChatService
             throw new InvalidOperationChatException("Cannot create direct message chat with yourself.");
         }
 
+        var existingChats = await _chatRepository.GetUserChatsAsync(userId, "individual");
+        var existingDM = existingChats.FirstOrDefault(c =>
+            c.Type == "individual" &&
+            c.Participants.Count == 2 &&
+            c.Participants.Any(p => p.UserId == otherUserId));
+
+        if (existingDM != null)
+        {
+            throw new InvalidOperationChatException("Direct message chat already exists with this user.");
+        }
+
         var chatRoom = new ChatRoom
         {
             Type = "individual",
@@ -88,26 +99,6 @@ public class ChatService : IChatService
 
     public async Task<IEnumerable<ChatDto>> GetUserChatsAsync(string userId, string? type = null)
     {
-        //var query = _chatRepository.GetItemLinqQueryable<ChatRoom>()
-        //    .Where(c => c.Participants.Any(p => p.UserId == userId));
-
-        //if (!string.IsNullOrEmpty(type))
-        //{
-        //    query = query.Where(c => c.Type == type);
-        //}
-
-        //var iterator = query.ToFeedIterator();
-        //var chats = new List<ChatRoom>();
-
-        //while (iterator.HasMoreResults)
-        //{
-        //    var response = await iterator.ReadNextAsync();
-        //    chats.AddRange(response);
-        //}
-
-        //return chats
-        //    .OrderByDescending(c => c.LastMessageAt)
-        //    .Select(c => c.ToDto());
         var chats = await _chatRepository.GetUserChatsAsync(userId, type);
         return chats.OrderByDescending(c => c.LastMessageAt).Select(c => c.ToDto());
     }
