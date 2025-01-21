@@ -21,9 +21,9 @@ public static class UserClaimsHelper
             .Select(c => c.Value);
 
         return roles.FirstOrDefault(r =>
-            r == "volunteer" ||
+            r == "admin" ||
             r == "team-lead" ||
-            r == "admin") ?? "volunteer";
+            r == "volunteer") ?? "volunteer";
     }
 
     public static bool IsInRole(this ClaimsPrincipal user, string role)
