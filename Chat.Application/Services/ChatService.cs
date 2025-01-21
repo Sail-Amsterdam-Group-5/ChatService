@@ -70,11 +70,6 @@ public class ChatService : IChatService
             c.Participants.Count == 2 &&
             c.Participants.Any(p => p.UserId == otherUserId));
 
-        if (existingDM != null)
-        {
-            throw new InvalidOperationChatException("Direct message chat already exists with this user.");
-        }
-
         var chatRoom = new ChatRoom
         {
             Type = "individual",
