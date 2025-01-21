@@ -57,24 +57,59 @@ public class DatabaseSeeder
                     }
                 });
 
-            var groupChatId = Guid.NewGuid().ToString();
-            var groupChat = new ChatRoom
+            var announceGroupId = Guid.NewGuid().ToString();
+            var generalGroupId = Guid.NewGuid().ToString();
+            var hospitalityGroupId = Guid.NewGuid().ToString();
+            var dmChatId = Guid.NewGuid().ToString();
+
+            var announceGroup = new ChatRoom
             {
-                Id = groupChatId,
+                Id = announceGroupId,
                 Type = "group",
-                Name = "Test Group Chat",
+                Name = "SAIL Announcements",
+                CreatedAt = DateTime.UtcNow.AddDays(-10),
+                CreatedBy = USER_1,
+                IsActive = true,
+                LastMessageAt = DateTime.UtcNow,
+                Participants = new List<ChatParticipant>
+                {
+                    new() { UserId = USER_1, Role = "admin", JoinedAt = DateTime.UtcNow.AddDays(-10) },
+                    new() { UserId = USER_3, Role = "member", JoinedAt = DateTime.UtcNow.AddDays(-10) }
+                }
+            };
+
+            var generalGroup = new ChatRoom
+            {
+                Id = generalGroupId,
+                Type = "group",
+                Name = "SAIL General",
+                CreatedAt = DateTime.UtcNow.AddDays(-7),
+                CreatedBy = USER_1,
+                IsActive = true,
+                LastMessageAt = DateTime.UtcNow,
+                Participants = new List<ChatParticipant>
+                {
+                    new() { UserId = USER_1, Role = "admin", JoinedAt = DateTime.UtcNow.AddDays(-7) },
+                    new() { UserId = USER_3, Role = "member", JoinedAt = DateTime.UtcNow.AddDays(-7) }
+                }
+            };
+
+            var hospitalityGroup = new ChatRoom
+            {
+                Id = hospitalityGroupId,
+                Type = "group",
+                Name = "Hospitality workers",
                 CreatedAt = DateTime.UtcNow.AddDays(-5),
                 CreatedBy = USER_1,
                 IsActive = true,
                 LastMessageAt = DateTime.UtcNow,
                 Participants = new List<ChatParticipant>
-               {
-                   new() { UserId = USER_1, Role = "admin", JoinedAt = DateTime.UtcNow.AddDays(-5) },
-                   new() { UserId = USER_3, Role = "member", JoinedAt = DateTime.UtcNow.AddDays(-5) }
-               }
+                {
+                    new() { UserId = USER_1, Role = "admin", JoinedAt = DateTime.UtcNow.AddDays(-5) },
+                    new() { UserId = USER_3, Role = "member", JoinedAt = DateTime.UtcNow.AddDays(-5) }
+                }
             };
 
-            var dmChatId = Guid.NewGuid().ToString();
             var dmChat = new ChatRoom
             {
                 Id = dmChatId,
@@ -84,55 +119,87 @@ public class DatabaseSeeder
                 IsActive = true,
                 LastMessageAt = DateTime.UtcNow,
                 Participants = new List<ChatParticipant>
-               {
-                   new() { UserId = USER_1, Role = "member", JoinedAt = DateTime.UtcNow.AddDays(-3) },
-                   new() { UserId = USER_3, Role = "member", JoinedAt = DateTime.UtcNow.AddDays(-3) }
-               }
+                {
+                    new() { UserId = USER_1, Role = "member", JoinedAt = DateTime.UtcNow.AddDays(-3) },
+                    new() { UserId = USER_3, Role = "member", JoinedAt = DateTime.UtcNow.AddDays(-3) }
+                }
             };
 
-            _logger.LogInformation("Creating group chat...");
-            await database.Database.GetContainer(_chatsContainer)
-                .CreateItemAsync(groupChat, new PartitionKey(groupChat.Id));
-
-            _logger.LogInformation("Creating DM chat...");
-            await database.Database.GetContainer(_chatsContainer)
-                .CreateItemAsync(dmChat, new PartitionKey(dmChat.Id));
+            // Create the chats in the database
+            var chatsContainer = database.Database.GetContainer(_chatsContainer);
+            await chatsContainer.CreateItemAsync(announceGroup, new PartitionKey(announceGroup.Id));
+            await chatsContainer.CreateItemAsync(generalGroup, new PartitionKey(generalGroup.Id));
+            await chatsContainer.CreateItemAsync(hospitalityGroup, new PartitionKey(hospitalityGroup.Id));
+            await chatsContainer.CreateItemAsync(dmChat, new PartitionKey(dmChat.Id));
 
             var messagesContainer = database.Database.GetContainer(_messagesContainer);
 
-            // Generate 300 messages for group chat
-            _logger.LogInformation("Creating 300 group messages...");
-            for (int i = 1; i <= 300; i++)
+            // Sample messages for SAIL Announcements
+            var announceMessages = new[]
             {
-                var message = new ChatMessage
+                ("Welcome to SAIL 2024! This channel will be used for important announcements.", USER_1),
+                ("Important: Safety briefing tomorrow at 9:00 AM at the main dock.", USER_1),
+                ("Weather update: Perfect sailing conditions expected this weekend!", USER_1),
+                ("Reminder: All volunteers must check in at their designated posts 30 minutes before their shift.", USER_1)
+            };
+
+            // Sample messages for SAIL General
+            var generalMessages = new[]
+            {
+                ("Hello everyone! Let's use this channel for general communication.", USER_1),
+                ("Has anyone seen where the extra life jackets are stored?", USER_3),
+                ("They're in the blue container near dock B", USER_1),
+                ("Thanks! Found them", USER_3),
+                ("What's the wifi password for the staff area?", USER_3),
+                ("I'll send it to you in a DM", USER_1)
+            };
+
+            // Sample messages for Hospitality workers
+            var hospitalityMessages = new[]
+            {
+                ("Welcome to the hospitality team channel!", USER_1),
+                ("When does the first shift start tomorrow?", USER_3),
+                ("First shift starts at 8:00 AM sharp", USER_1),
+                ("Don't forget your name badges!", USER_1),
+                ("Where do we pick up the new uniforms?", USER_3),
+                ("At the staff center, between 9-5", USER_1)
+            };
+
+            // Sample messages for DM
+            var dmMessages = new[]
+            {
+                ("Hey, got a minute to discuss the volunteer schedule?", USER_1),
+                ("Sure, what's up?", USER_3),
+                ("Can you cover the morning shift on Saturday?", USER_1),
+                ("Yes, that works for me", USER_3),
+                ("Great, thanks! I'll update the schedule", USER_1),
+                ("No problem! Looking forward to it", USER_3)
+            };
+
+            // Helper function to create messages
+            async Task CreateMessages(string chatId, (string message, string senderId)[] messages)
+            {
+                for (int i = 0; i < messages.Length; i++)
                 {
-                    Id = Guid.NewGuid().ToString(),
-                    ChatId = groupChatId,
-                    SenderId = i % 2 == 0 ? USER_1 : USER_3,
-                    Type = "text",
-                    Content = new MessageContent { Text = $"Group Message #{i}" },
-                    CreatedAt = DateTime.UtcNow.AddDays(-5).AddMinutes(i * 2),
-                    IsDeleted = false
-                };
-                await messagesContainer.CreateItemAsync(message, new PartitionKey(message.ChatId));
+                    var message = new ChatMessage
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        ChatId = chatId,
+                        SenderId = messages[i].senderId,
+                        Type = "text",
+                        Content = new MessageContent { Text = messages[i].message },
+                        CreatedAt = DateTime.UtcNow.AddDays(-1).AddHours(i),
+                        IsDeleted = false
+                    };
+                    await messagesContainer.CreateItemAsync(message, new PartitionKey(message.ChatId));
+                }
             }
 
-            // Generate 300 messages for DM chat
-            _logger.LogInformation("Creating 300 DM messages...");
-            for (int i = 1; i <= 300; i++)
-            {
-                var message = new ChatMessage
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    ChatId = dmChatId,
-                    SenderId = i % 2 == 0 ? USER_1 : USER_3,
-                    Type = "text",
-                    Content = new MessageContent { Text = $"DM Message #{i}" },
-                    CreatedAt = DateTime.UtcNow.AddDays(-3).AddMinutes(i * 2),
-                    IsDeleted = false
-                };
-                await messagesContainer.CreateItemAsync(message, new PartitionKey(message.ChatId));
-            }
+            // Create all messages
+            await CreateMessages(announceGroupId, announceMessages);
+            await CreateMessages(generalGroupId, generalMessages);
+            await CreateMessages(hospitalityGroupId, hospitalityMessages);
+            await CreateMessages(dmChatId, dmMessages);
 
             _logger.LogInformation("Database seeded successfully!");
         }
