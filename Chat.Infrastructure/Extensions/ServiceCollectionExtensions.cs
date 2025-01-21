@@ -58,6 +58,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDeletedMessageRepository, DeletedMessageRepository>();
         services.AddScoped<IDeletedMessageService, DeletedMessageService>();
 
+        // Add DataSeeder
+        services.AddScoped<DatabaseSeeder>();
+
         return services;
     }
 }
